@@ -171,9 +171,9 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             if (col < 1 or col > Cols) {
                 return null;
             }
-            if (self.doors.getPtr(.{ .row = row, .col = col })) |door| {
-                return if (door.*) .opened_door else .closed_door;
-            }
+            // if (self.doors.get(.{ .row = row, .col = col })) |door| {
+            //     return if (door) .opened_door else .closed_door;
+            // }
             if (self.walls.isSet(row, col)) {
                 return .wall;
             }

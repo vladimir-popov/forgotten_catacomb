@@ -31,8 +31,8 @@ pub fn init(runtime: game.AnyRuntime) !Universe {
         .withComponent(cmp.Dungeon, dungeon);
 
     // Initialize systems:
-    // universe.registerSystem(handleInput);
-    // universe.registerSystem(handleMove);
+    universe.registerSystem(handleInput);
+    universe.registerSystem(handleMove);
     universe.registerSystem(render);
 
     return universe;
@@ -50,6 +50,18 @@ pub fn render(universe: *Universe) anyerror!void {
         const position = components[2];
         if (screen.region.containsPoint(position.point)) {
             try universe.runtime.drawSprite(screen, sprite, position);
+        }
+    }
+}
+
+pub fn handleInput(universe: *Universe) anyerror!void {
+    const btn = try universe.runtime.readButton();
+    if (btn == 0) return;
+
+    const player_entity = universe.getComponents(game.components.Level)[0].player;
+    if (universe.getComponent(player_entity, game.components.Move)) |move| {
+        if (game.Button.toDirection(btn)) |direction| {
+            move.direction = direction;
         }
     }
 }
