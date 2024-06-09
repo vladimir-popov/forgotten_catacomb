@@ -63,12 +63,12 @@ pub const Passage = struct {
     }
 };
 
-pub const Cell = enum { nothing, floor, wall, opened_door, closed_door };
-
 pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
     return struct {
         /// The dungeon. Contains walls, doors, rooms and passages of the level.
         const Self = @This();
+
+        pub const Cell = enum { nothing, floor, wall, opened_door, closed_door };
 
         pub const Rows: u8 = rows_count;
         pub const Cols: u8 = cols_count;

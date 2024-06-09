@@ -66,8 +66,10 @@ fn readButton(ptr: *anyopaque) anyerror!game.Button.Type {
 fn drawDungeon(ptr: *anyopaque, screen: *const cmp.Screen, dungeon: *const cmp.Dungeon) anyerror!void {
     var position = game.components.Position{ .point = screen.region.top_left };
     var sprite = game.components.Sprite{ .letter = undefined };
-    var itr = dungeon.cellsInRegion(screen.region) orelse return;
-    while (itr.next()) |cell| {
+    // var itr = dungeon.cellsInRegion(screen.region) orelse return;
+    // while (itr.next()) |cell| {
+    const cell = cmp.Dungeon.Cell.wall;
+    _ = dungeon;
         sprite.letter = switch (cell) {
             .nothing => " ",
             .floor => ".",
@@ -81,7 +83,7 @@ fn drawDungeon(ptr: *anyopaque, screen: *const cmp.Screen, dungeon: *const cmp.D
             position.point.col = screen.region.top_left.col;
             position.point.move(.down);
         }
-    }
+    // }
 }
 
 fn drawSprite(

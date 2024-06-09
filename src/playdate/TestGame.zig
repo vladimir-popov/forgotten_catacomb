@@ -41,8 +41,8 @@ pub fn init(runtime: game.AnyRuntime) !Universe {
 pub fn render(universe: *Universe) anyerror!void {
     const screen = &universe.getComponents(cmp.Screen)[0];
 
-    // const dungeon = &universe.getComponents(cmp.Dungeon)[0];
-    // try universe.runtime.drawDungeon(screen, dungeon);
+    const dungeon = &universe.getComponents(cmp.Dungeon)[0];
+    try universe.runtime.drawDungeon(screen, dungeon);
 
     var itr = universe.queryComponents2(cmp.Sprite, cmp.Position);
     while (itr.next()) |components| {
