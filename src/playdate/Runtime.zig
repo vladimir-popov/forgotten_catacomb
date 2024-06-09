@@ -60,13 +60,13 @@ fn readButton(ptr: *anyopaque) anyerror!game.Button.Type {
     var self: *Self = @ptrCast(@alignCast(ptr));
     var button: api.PDButtons = undefined;
     self.playdate.system.getButtonState(null, &button, null);
-    return @truncate(button);
+    return button;
 }
 
 fn drawDungeon(ptr: *anyopaque, screen: *const cmp.Screen, dungeon: *const cmp.Dungeon) anyerror!void {
-    var itr = dungeon.cellsInRegion(screen.region) orelse return;
     var position = game.components.Position{ .point = screen.region.top_left };
     var sprite = game.components.Sprite{ .letter = undefined };
+    var itr = dungeon.cellsInRegion(screen.region) orelse return;
     while (itr.next()) |cell| {
         sprite.letter = switch (cell) {
             .nothing => " ",

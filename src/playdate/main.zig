@@ -5,6 +5,8 @@ const tools = @import("tools");
 
 const Runtime = @import("Runtime.zig");
 
+const TestGame = @import("TestGame.zig");
+
 const CurrentPlatform = tools.Platform.Playdate;
 
 pub const log_level: std.log.Level = .warn;
@@ -43,12 +45,12 @@ var playdate_log_to_console: *const fn (fmt: [*c]const u8, ...) callconv(.C) voi
 
 const GlobalState = struct {
     runtime: Runtime,
-    universe: game.Universe,
+    universe: TestGame.Universe,
 
     pub fn create(playdate: *api.PlaydateAPI) !*GlobalState {
         var state: *GlobalState = @ptrCast(@alignCast(playdate.system.realloc(null, @sizeOf(GlobalState))));
         state.runtime = Runtime.init(playdate);
-        state.universe = try game.init(try state.runtime.any());
+        state.universe = try TestGame.init(try state.runtime.any());
         return state;
     }
 };

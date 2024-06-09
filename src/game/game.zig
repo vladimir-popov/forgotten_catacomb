@@ -17,9 +17,9 @@ pub const TOTAL_ROWS: u8 = 40;
 pub const TOTAL_COLS: u8 = 100;
 
 /// The rows count to display
-const DISPLAY_ROWS: u8 = 15;
+pub const DISPLAY_ROWS: u8 = 15;
 /// The rows count to display
-const DISPLAY_COLS: u8 = 40;
+pub const DISPLAY_COLS: u8 = 40;
 
 const ROWS_PAD = 3;
 const COLS_PAD = 7;
