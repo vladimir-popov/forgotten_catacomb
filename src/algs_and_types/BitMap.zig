@@ -19,26 +19,34 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
         pub const rows: u8 = rows_count;
         pub const cols: u8 = cols_count;
 
-        bitsets: [rows]std.StaticBitSet(cols) = undefined,
+        bitsets: std.ArrayList(std.DynamicBitSet),
 
-        pub fn initEmpty() Self {
-            var self: Self = .{};
-            for (0..rows) |idx| {
-                self.bitsets[idx] = std.StaticBitSet(cols).initEmpty();
+        pub fn initEmpty(alloc: std.mem.Allocator) !Self {
+            var self: Self = .{ .bitsets = std.ArrayList(std.DynamicBitSet).init(alloc) };
+            for (0..rows) |_| {
+                try self.bitsets.append(try std.DynamicBitSet.initEmpty(alloc, cols));
             }
             return self;
         }
 
-        pub fn initFull() Self {
-            var self: Self = .{};
-            for (0..rows) |idx| {
-                self.bitsets[idx] = std.StaticBitSet(cols).initFull();
+        pub fn initFull(alloc: std.mem.Allocator) !Self {
+            var self: Self = .{ .bitsets = std.ArrayList(std.DynamicBitSet).init(alloc) };
+            for (0..rows) |_| {
+                try self.bitsets.append(try std.DynamicBitSet.initFull(alloc, cols));
             }
             return self;
         }
 
-        pub fn parse(comptime symbol: u8, str: []const u8) Error!Self {
-            var self: Self = .{};
+        pub fn deinit(self: Self) void {
+            for (self.bitsets.items) |*bs| {
+                bs.deinit();
+            }
+            self.bitsets.deinit();
+        }
+
+        pub fn parse(comptime symbol: u8, alloc: std.mem.Allocator, str: []const u8) !Self {
+            var self: Self = .{ .bitsets = std.ArrayList(std.DynamicBitSet).init(alloc) };
+            try self.bitsets.append(try std.DynamicBitSet.initEmpty(alloc, cols));
             var r: u8 = 1;
             var c: u8 = 1;
             for (str) |char| {
@@ -51,6 +59,7 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
                             );
                             return Error.WrongColumnsCountInString;
                         }
+                        try self.bitsets.append(try std.DynamicBitSet.initEmpty(alloc, cols));
                         r += 1;
                         c = 0;
                     },
@@ -74,11 +83,11 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
         }
 
         pub inline fn isSet(self: Self, row: u8, col: u8) bool {
-            return self.bitsets[row - 1].isSet(col - 1);
+            return self.bitsets.items[row - 1].isSet(col - 1);
         }
 
         pub inline fn set(self: *Self, row: u8, col: u8) void {
-            self.bitsets[row - 1].set(col - 1);
+            self.bitsets.items[row - 1].set(col - 1);
         }
 
         pub inline fn setAt(self: *Self, point: p.Point) void {
@@ -86,7 +95,7 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
         }
 
         pub inline fn unset(self: *Self, row: u8, col: u8) void {
-            self.bitsets[row - 1].unset(col - 1);
+            self.bitsets.items[row - 1].unset(col - 1);
         }
 
         pub inline fn unsetAt(self: *Self, point: p.Point) void {
@@ -100,7 +109,7 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
             count: u8,
             value: bool,
         ) void {
-            self.bitsets[row - 1].setRangeValue(
+            self.bitsets.items[row - 1].setRangeValue(
                 .{ .start = from_col - 1, .end = from_col + count - 1 },
                 value,
             );
@@ -116,7 +125,7 @@ pub fn BitMap(comptime rows_count: u8, cols_count: u8) type {
             const to_row = @min(rows, region.bottomRightRow()) + 1;
             const to_col = @min(cols, region.bottomRightCol());
             for (region.top_left.row..to_row) |r| {
-                self.bitsets[r - 1].setRangeValue(
+                self.bitsets.items[r - 1].setRangeValue(
                     .{ .start = region.top_left.col - 1, .end = to_col },
                     value,
                 );
@@ -134,7 +143,7 @@ test "parse BitMap" {
     ;
 
     // when:
-    var bitmap = try BitMap(3, 3).parse('#', str);
+    var bitmap = try BitMap(3, 3).parse('#', std.testing.allocator, str);
 
     // then:
     for (0..3) |r| {
@@ -147,14 +156,14 @@ test "parse BitMap" {
 
 test "unset a region" {
     // given:
-    var bitmap = BitMap(10, 10).initFull();
+    var bitmap = try BitMap(10, 10).initFull(std.testing.allocator);
     const region = p.Region{ .top_left = .{ .row = 2, .col = 2 }, .rows = 5, .cols = 5 };
 
     // when:
     bitmap.setRegionValue(region, false);
 
     // then:
-    for (bitmap.bitsets, 1..) |row, r| {
+    for (bitmap.bitsets.items, 1..) |row, r| {
         for (0..10) |c_idx| {
             const cell = row.isSet(c_idx);
             const expect = !region.containsPoint(.{ .row = @intCast(r), .col = @intCast(c_idx + 1) });

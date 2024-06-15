@@ -112,6 +112,9 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             for (self.passages.items) |passage| {
                 passage.deinit();
             }
+            self.floor.deinit();
+            self.walls.deinit();
+            self.objects.deinit();
             self.passages.deinit();
             self.rooms.deinit();
             self.objects_map.deinit();
@@ -123,11 +126,11 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
             instance.* = .{
                 .alloc = alloc,
                 .rand = rand,
-                .floor = BitMap.initEmpty(),
-                .walls = BitMap.initEmpty(),
-                .objects = BitMap.initEmpty(),
                 .rooms = std.ArrayList(Room).init(alloc),
                 .passages = std.ArrayList(Passage).init(alloc),
+                .floor = try BitMap.initEmpty(alloc),
+                .walls = try BitMap.initEmpty(alloc),
+                .objects = try BitMap.initEmpty(alloc),
                 .objects_map = std.AutoHashMap(p.Point, Cell).init(alloc),
             };
             return instance;
@@ -170,8 +173,8 @@ pub fn BspDungeon(comptime rows_count: u8, cols_count: u8) type {
                 @compileError("The function `parse` is for test purpose only");
             }
             const dungeon = try Self.createEmpty(alloc, rand);
-            dungeon.floor = try BitMap.parse('.', str);
-            dungeon.walls = try BitMap.parse('#', str);
+            dungeon.floor = try BitMap.parse('.', alloc, str);
+            dungeon.walls = try BitMap.parse('#', alloc, str);
             return dungeon;
         }
 
