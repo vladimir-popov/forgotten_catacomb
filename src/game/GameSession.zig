@@ -16,6 +16,10 @@ const Mode = enum { play, pause };
 runtime: game.AnyRuntime,
 /// Collection of the entities of this game session
 entities: ecs.EntitiesManager,
+/// In some cases entities are able to be on the same place.
+/// For example, when enemy or player is in the doorway,
+/// or stay on an item. Also, more than one item can be on the same place.
+stacked_entities: std.AutoHashMap(p.Point, []game.Entity),
 /// Collection of the components of the entities
 components: ecs.ComponentsManager(game.Components),
 /// Aggregates requests of few components for the same entities at once
@@ -37,6 +41,7 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
         .runtime = runtime,
         .screen = game.Screen.init(game.DISPLAY_DUNG_ROWS, game.DISPLAY_DUNG_COLS, game.Dungeon.Region),
         .entities = try ecs.EntitiesManager.init(runtime.alloc),
+        .stacked_entities = std.AutoHashMap(p.Point, []game.Entity).init(runtime.alloc),
         .components = try ecs.ComponentsManager(game.Components).init(runtime.alloc),
         .dungeon = try game.Dungeon.createRandom(runtime.alloc, runtime.rand),
     };
@@ -47,12 +52,13 @@ pub fn create(runtime: game.AnyRuntime) !*Self {
     session.play_mode = try game.PlayMode.create(session);
     session.pause_mode = try game.PauseMode.create(session);
 
-    session.play();
+    try session.play();
     return session;
 }
 
 pub fn destroy(self: *Self) void {
     self.entities.deinit();
+    self.stacked_entities.deinit();
     self.components.deinit();
     self.dungeon.destroy();
     self.play_mode.destroy();
@@ -60,7 +66,7 @@ pub fn destroy(self: *Self) void {
     self.runtime.alloc.destroy(self);
 }
 
-pub fn play(session: *Self) void {
+pub fn play(session: *Self) !void {
     var target = session.player;
     switch (session.mode) {
         .pause => {
@@ -70,7 +76,7 @@ pub fn play(session: *Self) void {
         else => {},
     }
     session.mode = .play;
-    session.play_mode.refresh(target);
+    try session.play_mode.refresh(target);
 }
 
 pub fn pause(session: *Self) !void {
@@ -87,23 +93,57 @@ pub inline fn tick(session: *Self) !void {
 
 pub inline fn drawMode(session: *Self) !void {
     switch (session.mode) {
-        .play => try session.play_mode.draw(),
-        .pause => try session.pause_mode.draw(),
+        .play => try session.play_mode.higlightEntityAndDrawQuickAction(),
+        .pause => try session.pause_mode.highlightEntityInFocus(),
     }
 }
 
-pub fn entityAt(session: *game.GameSession, place: p.Point) ?game.Entity {
+/// Returns the entity on the specified place, or null if no one entity there.
+/// If the place has more than one entity, only the top entity from the stack
+/// will be returned.
+pub fn entityAt(session: *Self, place: p.Point) ?game.Entity {
+    // TODO optimize this function, or code which use it
     for (session.components.arrayOf(game.Position).components.items, 0..) |position, idx| {
         if (position.point.eql(place)) {
-            return session.components.arrayOf(game.Position).index_entity.get(@intCast(idx));
+            if (session.stacked_entities.get(place)) |entities| {
+                return entities[entities.len - 1];
+            } else {
+                return session.components.arrayOf(game.Position).index_entity.get(@intCast(idx));
+            }
         }
     }
     return null;
 }
 
 pub fn removeEntity(self: *Self, entity: game.Entity) !void {
+    if (self.components.getForEntity(entity, game.Position)) |position| {
+        if (self.stacked_entities.get(position)) |entities| {
+            for (0..entities.len) |i| {
+                if (entities[i] == entity) {
+                    self.removeStackedEntity(entity);
+                    break;
+                }
+            }
+        }
+    }
     try self.components.removeAllForEntity(entity);
     self.entities.removeEntity(entity);
+}
+
+fn addEntityOnPosition(self: *Self, entity: game.Entity, position: p.Point) !void {
+    self.stacked_entities.getOrPutValue(position, ???)
+}
+
+fn removeStackedEntity(self: *Self, stack_idx: u8, position: p.Point) void {
+    if (self.stacked_entities.get(position)) |entities| {
+        if (entities.len == 1) {
+            self.stacked_entities.remove(position);
+        } else {
+            entities[stack_idx] = entities[entities.len - 1];
+            entities[entities.len - 1] = 0;
+            entities.len -= 1;
+        }
+    }
 }
 
 // this is public to reuse in the DungeonsGenerator

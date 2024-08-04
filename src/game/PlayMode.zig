@@ -24,15 +24,18 @@ const EntityInFocus = struct {
 
 session: *game.GameSession,
 actors: std.ArrayList(Actor),
-/// Index of the actor, which should do move on next tick
+/// Index of the actor, which should do its move on the next tick
 current_actor: u8,
 /// Is the player should do its move now?
 players_move: bool,
-/// How many actors except player did their move
+/// How many actors except player did their move.
+/// When all actors complete their move, the player's turn comes
 moved_actors: u8,
-/// An entity in player's focus to which a quick action can be applied
+/// An entity in player's focus to which a quick action can be applied.
+/// This entity will be highlighted
 target_entity: ?EntityInFocus,
-/// Who is attacking the player right now
+/// Who is attacking the player right now.
+/// This entity will be highlighted for its move instead of the target
 attacking_entity: ?game.Entity,
 
 pub fn create(session: *game.GameSession) !*PlayMode {
@@ -53,16 +56,18 @@ pub fn destroy(self: *PlayMode) void {
 }
 
 /// Updates the target entity after switching back to the play mode
-pub fn refresh(self: *PlayMode, target: game.Entity) void {
+pub fn refresh(self: *PlayMode, target: game.Entity) !void {
     if (calculateQuickActionForTarget(target, self.session)) |qa| {
         self.target_entity = .{ .entity = target, .quick_action = qa };
     } else {
         self.findTarget();
     }
+    try Render.redraw(self.session);
+    try self.higlightEntityAndDrawQuickAction();
 }
 
 pub fn tick(self: *PlayMode) anyerror!void {
-    try Render.render(self.session);
+    try Render.drawAnimationsFrame(self.session);
     if (self.session.components.getAll(game.Animation).len > 0)
         return;
 
@@ -71,6 +76,7 @@ pub fn tick(self: *PlayMode) anyerror!void {
             try self.handleInput(buttons);
             if (self.session.components.getForEntity(self.session.player, game.Action)) |action| {
                 self.players_move = false;
+                // After player's turn, enemies get move points equal to player's action
                 try self.updateActors(action.move_points);
             }
         }
@@ -87,6 +93,7 @@ pub fn tick(self: *PlayMode) anyerror!void {
             }
             self.current_actor += 1;
         } else {
+            // All enemies did their moves. The turn comes back to the player
             self.players_move = self.moved_actors == 0;
             self.current_actor = 0;
             self.moved_actors = 0;
@@ -108,6 +115,7 @@ const Actor = struct {
     }
 };
 
+/// Recalculates list of actors, and set them passed move points.
 fn updateActors(self: *PlayMode, move_points: u8) !void {
     self.current_actor = 0;
     self.actors.clearRetainingCapacity();
@@ -133,7 +141,8 @@ fn runSystems(self: *PlayMode) !void {
     try ActionSystem.doActions(self.session);
     try DamageSystem.handleDamage(self.session);
     try updateTarget(self);
-    try Render.render(self.session);
+    try Render.drawVisibleSprites(self.session);
+    try self.higlightEntityAndDrawQuickAction();
 }
 
 pub fn handleInput(self: PlayMode, buttons: game.Buttons) !void {
@@ -170,8 +179,7 @@ pub fn handleInput(self: PlayMode, buttons: game.Buttons) !void {
     }
 }
 
-/// Highlight entity and draw quick action
-pub fn draw(self: *const PlayMode) !void {
+pub fn higlightEntityAndDrawQuickAction(self: *const PlayMode) !void {
     if (self.attacking_entity) |entity| {
         try highlightEntity(self.session, entity);
     } else if (self.target_entity) |target| {

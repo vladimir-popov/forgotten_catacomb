@@ -1,3 +1,6 @@
+/// Set of methods to draw the game.
+/// Comparing with `AnyRuntime`, this module contains methods
+/// to draw objects from the game domain.
 const std = @import("std");
 const algs_and_types = @import("algs_and_types");
 const p = algs_and_types.primitives;
@@ -5,12 +8,38 @@ const game = @import("game.zig");
 
 const log = std.log.scoped(.render);
 
-const Render = @This();
-
-pub fn render(session: *game.GameSession) anyerror!void {
-    const screen = &session.screen;
+/// Fills the screen by the background color
+pub inline fn clearScreen(session: *const game.GameSession) !void {
     try session.runtime.clearScreen();
-    // Draw UI
+}
+
+/// Draws the walls and floor
+pub inline fn drawDungeon(session: *const game.GameSession) !void {
+    try session.runtime.drawDungeon(&session.screen, session.dungeon);
+}
+
+/// Draws the single sprite
+pub inline fn drawSprite(
+    session: *const game.GameSession,
+    sprite: *const game.Sprite,
+    position: *const game.Position,
+    mode: game.AnyRuntime.DrawingMode,
+) !void {
+    try session.runtime.drawSprite(&session.screen, sprite, position, mode);
+}
+
+/// Clears the screen and draw all from scratch.
+/// Removes completed animations.
+pub fn redraw(session: *game.GameSession) !void {
+    try clearScreen(session);
+    try drawUI(session);
+    try drawDungeon(session);
+    try drawVisibleSprites(session);
+    try drawAnimationsFrame(session);
+}
+
+/// Draws border of the UI and the right pane
+pub fn drawUI(session: *const game.GameSession) !void {
     try session.runtime.drawUI();
     // Draw the right area (stats)
     if (session.components.getForEntity(session.player, game.Health)) |health| {
@@ -20,22 +49,29 @@ pub fn render(session: *game.GameSession) anyerror!void {
             .{ .row = 2, .col = game.DISPLAY_DUNG_COLS + 2 },
         );
     }
-    // Draw walls and floor
-    try session.runtime.drawDungeon(screen, session.dungeon);
-    // Draw sprites inside the screen
-    var itr = session.query.get2(game.Position, game.Sprite);
-    while (itr.next()) |tuple| {
-        if (screen.region.containsPoint(tuple[1].point)) {
-            try session.runtime.drawSprite(screen, tuple[2], tuple[1], .normal);
-        }
-    }
-    // Draw mode's specifics
-    try session.drawMode();
-    // Draw a single frame from the every animation:
-    try drawAnimationFrame(session, session.runtime.currentMillis());
 }
 
-fn drawAnimationFrame(session: *game.GameSession, now: c_uint) !void {
+/// Draw sprites inside the screen
+pub fn drawVisibleSprites(session: *const game.GameSession) !void {
+    var itr = session.query.get2(game.Position, game.Sprite);
+    while (itr.next()) |tuple| {
+        if (session.screen.region.containsPoint(tuple[1].point)) {
+            try session.runtime.drawSprite(&session.screen, tuple[2], tuple[1], .normal);
+        }
+    }
+}
+
+pub fn drawEntity(session: *const game.GameSession, entity: game.Entity, mode: game.AnyRuntime.DrawingMode) !void {
+    if (session.components.getForEntity(entity, game.Sprite)) |entity_sprite| {
+        const position = session.components.getForEntityUnsafe(entity, game.Position);
+        try session.runtime.drawSprite(&session.screen, entity_sprite, position, mode);
+    }
+}
+
+/// Draws a single frame from the every animation.
+/// Removes the animation if the last frame was drawn.
+pub fn drawAnimationsFrame(session: *game.GameSession) !void {
+    const now: c_uint = session.runtime.currentMillis();
     var itr = session.query.get2(game.Position, game.Animation);
     while (itr.next()) |components| {
         const position = components[1];

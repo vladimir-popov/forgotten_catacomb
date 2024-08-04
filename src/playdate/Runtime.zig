@@ -118,7 +118,10 @@ fn readPushedButtons(ptr: *anyopaque) anyerror!?game.Buttons {
     return null;
 }
 
-fn clearScreen(_: *anyopaque) anyerror!void {}
+fn clearScreen(ptr: *anyopaque) anyerror!void {
+    var self: *Self = @ptrCast(@alignCast(ptr));
+    self.playdate.graphics.clear(@intFromEnum(api.LCDSolidColor.ColorBlack));
+}
 
 fn drawUI(ptr: *anyopaque) anyerror!void {
     var self: *Self = @ptrCast(@alignCast(ptr));

@@ -58,16 +58,16 @@ pub export fn eventHandler(playdate: *api.PlaydateAPI, event: api.PDSystemEvent,
                 @panic("Error on creating game session");
 
             playdate.display.setRefreshRate(0);
-            playdate.system.setUpdateCallback(update_and_render, state);
+            playdate.system.setUpdateCallback(updateAndRender, state);
         },
         else => {},
     }
     return 0;
 }
 
-fn update_and_render(userdata: ?*anyopaque) callconv(.C) c_int {
+fn updateAndRender(userdata: ?*anyopaque) callconv(.C) c_int {
     const state: *GlobalState = @ptrCast(@alignCast(userdata.?));
-    state.runtime.playdate.graphics.clear(@intFromEnum(api.LCDSolidColor.ColorBlack));
+    // state.runtime.playdate.graphics.clear(@intFromEnum(api.LCDSolidColor.ColorBlack));
 
     state.session.tick() catch |err|
         std.debug.panic("Error {any} on game tick", .{err});

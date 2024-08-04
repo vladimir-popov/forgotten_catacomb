@@ -39,35 +39,31 @@ pub fn refresh(self: *PauseMode) !void {
         if (self.session.screen.region.containsPoint(tuple[1].point))
             try self.entities_on_screen.put(tuple[1].point, tuple[0]);
     }
+    try Render.redraw(self.session);
 }
 
 pub fn tick(self: *PauseMode) anyerror!void {
+    try self.highlightEntityInFocus();
     // Nothing should happened until the player pushes a button
     if (try self.session.runtime.readPushedButtons()) |btn| {
         switch (btn.code) {
             game.Buttons.A => {},
             game.Buttons.B => {
-                self.session.play();
+                try self.session.play();
                 return;
             },
             game.Buttons.Left, game.Buttons.Right, game.Buttons.Up, game.Buttons.Down => {
-                self.chooseNextEntity(btn.toDirection().?);
+                try self.chooseNextEntity(btn.toDirection().?);
             },
             else => {},
         }
     }
-    // rendering should be independent on input,
-    // to be able to play animations
-    try Render.render(self.session);
 }
 
-pub fn draw(self: PauseMode) !void {
+pub fn highlightEntityInFocus(self: PauseMode) !void {
     try self.session.runtime.drawText("pause", .{ .row = 1, .col = game.DISPLAY_DUNG_COLS + 2 });
     // highlight entity in focus
-    if (self.session.components.getForEntity(self.target, game.Sprite)) |target_sprite| {
-        const position = self.session.components.getForEntityUnsafe(self.target, game.Position);
-        try self.session.runtime.drawSprite(&self.session.screen, target_sprite, position, .inverted);
-    }
+    try Render.drawEntity(self.session, self.target, .inverted);
     if (self.session.components.getForEntity(self.target, game.Description)) |description| {
         try Render.drawEntityName(self.session, description.name);
     }
@@ -76,11 +72,12 @@ pub fn draw(self: PauseMode) !void {
     }
 }
 
-fn chooseNextEntity(self: *PauseMode, direction: p.Direction) void {
+fn chooseNextEntity(self: *PauseMode, direction: p.Direction) !void {
     const init_position = self.session.components.getForEntityUnsafe(self.target, game.Position).point;
     var itr = Iterator.init(init_position, direction, self.session.screen.region);
     while (itr.next()) |position| {
         if (self.entities_on_screen.get(position)) |entity| {
+            try Render.drawEntity(self.session, self.target, .normal);
             self.target = entity;
             return;
         }

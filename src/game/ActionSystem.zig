@@ -3,6 +3,8 @@ const algs_and_types = @import("algs_and_types");
 const p = algs_and_types.primitives;
 const game = @import("game.zig");
 
+const Render = @import("Render.zig");
+
 const log = std.log.scoped(.action_system);
 
 /// Handles intentions to do some actions
@@ -13,7 +15,7 @@ pub fn doActions(session: *game.GameSession) !void {
         const action = components[1];
         const position = components[2];
         switch (action.type) {
-            .move => |*move| {
+            .move => |move| {
                 _ = try handleMoveAction(session, entity, position, move);
             },
             .open => |door| {
@@ -48,7 +50,7 @@ fn handleMoveAction(
     session: *game.GameSession,
     entity: game.Entity,
     position: *game.Position,
-    move: *game.Action.Move,
+    move: game.Action.Move,
 ) !bool {
     const new_position = position.point.movedTo(move.direction);
     if (checkCollision(session, new_position)) |obstacle| {
@@ -58,6 +60,7 @@ fn handleMoveAction(
         );
         return false;
     }
+    try Render.drawSprite(session, &game.Sprite{ .codepoint = '.' }, position, .normal);
     position.point.move(move.direction);
     if (entity != session.player) return true;
 
@@ -65,14 +68,19 @@ fn handleMoveAction(
     const screen = &session.screen;
     const inner_region = screen.innerRegion();
     if (move.direction == .up and position.point.row < inner_region.top_left.row)
-        screen.move(move.direction);
+        try moveScreen(session, move.direction);
     if (move.direction == .down and position.point.row > inner_region.bottomRightRow())
-        screen.move(move.direction);
+        try moveScreen(session, move.direction);
     if (move.direction == .left and position.point.col < inner_region.top_left.col)
-        screen.move(move.direction);
+        try moveScreen(session, move.direction);
     if (move.direction == .right and position.point.col > inner_region.bottomRightCol())
-        screen.move(move.direction);
+        try moveScreen(session, move.direction);
     return true;
+}
+
+fn moveScreen(session: *game.GameSession, direction: p.Direction) !void {
+    session.screen.move(direction);
+    try Render.redraw(session);
 }
 
 fn checkCollision(session: *game.GameSession, position: p.Point) ?game.Collision.Obstacle {
